@@ -13,7 +13,13 @@
 > 本文档第 2~4 节的「正确值」仅作历史留档，实际口径以 AGENTS.md「业务指标口径」一节为准。主要变化：
 > 所有 COUNT 改为**按行计数**（不再按 Email 去重）；All Leads 增加生命周期过滤（排除 Subscriber 与空值）；
 > 新增 All Customers；All Revenue 去掉 Closed Won 限制；Paid Leads 改用 `LEAD_STAGES` 集合；
-> Paid Deals 改从 Leads 表取（付费来源且生命周期为 Customer）；漏斗第 5 层统一为 Customers。
+> 漏斗第 5 层统一为 Customers。
+>
+> **同日二次更新（口径表 16:48 版）**：Sheet1 第 13 行由 `Paid Deals` 改名为 **`Paid Customers`**，取数不变
+> （Leads 表付费来源且生命周期 == Customer 的行数）；第 14 行 `Paid Revenue` 明确为 `SUM(Amount)`，
+> 与实现一致。代码里的 KPI 键名与卡片标题已同步为 `paid_customers` / "Paid Customers"。
+> 另修一处口径表未覆盖的漏数：地区为空的行此前被整行丢弃（Traffic 少 1 session、Leads 少 61 行），
+> 现归入 `Unassigned` 参与总量。
 
 ---
 
@@ -199,7 +205,7 @@ current 是**整个区间**的聚合值，prior 是**区间起始日前一天**�
 | A2 | 日期带时分秒 | `_day()` 统一 `.dt.normalize()`；`_selected` 改半开区间 `[start, end+1d)` |
 | A3 | 漏斗键名拼接 | `metrics.FUNNEL_KEYS` 显式声明 `all_*` 与 `paid_*`；Revenue 层不再算转化率 |
 | A4 | 日期格式推断 | `_flexible_to_datetime` 走 `format="mixed"` |
-| B4 | 广告地区口径 | `config.AD_ACCOUNT_REGION_MAP` + `metrics._selected_ad_cost`；账户名不进地区下拉 |
+| B4 | 广告地区口径 | `config.region_group()`：账户名先经 `AD_ACCOUNT_REGION_MAP` 映射到覆盖国家，再归入区域组；账户名不进地区下拉 |
 | B5 | 环比不成立 | `app._previous_period` 等长前移区间，文案改 `vs prior period` |
 | B6 | 付费口径不自洽 | Paid MQLs/SQLs 改用与整体一致的生命周期集合 |
 | C7 | 死代码 | 移除 `compute_region_heatmap` 里未使用的 `trend`；漏斗图现在真正消费 `conversion` |

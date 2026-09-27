@@ -7,9 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: digital-marketing-dashboard
     restart: unless-stopped
-    command: ["python", "app.py", "--data-dir", "/data", "--host", "0.0.0.0", "--port", "8050"]
-    volumes:
-      - ./数据底表V1:/data:ro
+    # 上传模式：不再挂载 数据底表V1，访问者在页面里自己上传四个 CSV；对外服务关闭 debug
+    command: ["python", "app.py", "--host", "0.0.0.0", "--port", "8050", "--debug", "0", "--reload", "0"]
     ports:
       - "127.0.0.1:8050:8050"
     networks:

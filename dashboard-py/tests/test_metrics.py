@@ -1,7 +1,17 @@
 import pandas as pd
 
+from config import TARGET_SPECS
 from data_loader import DataBundle
-from metrics import compute_daily_trends, compute_funnel, compute_kpis, compute_region_heatmap, compute_source_share, safe_ratio
+from metrics import (
+    as_number,
+    compute_daily_trends,
+    compute_funnel,
+    compute_kpis,
+    compute_region_heatmap,
+    compute_source_share,
+    compute_target_progress,
+    safe_ratio,
+)
 
 
 def sample_bundle():
@@ -235,3 +245,106 @@ def test_region_heatmap_groups_by_calendar_day():
 
     assert sorted(heatmap["date"].unique()) == [pd.Timestamp("2026-09-01"), pd.Timestamp("2026-09-02")]
     assert set(heatmap["region"]) == {"Brazil"}
+
+
+def _bundle_with_region_groups():
+    """Region 下拉是区域组，底表里存的却是国家名 / 广告账户名。"""
+    return DataBundle(
+        tables={
+            "leads": pd.DataFrame(
+                [
+                    ["2026-09-01", "Brazil", "1", "Lead", "Paid Search", "paid"],
+                    ["2026-09-01", "Colombia", "2", "Lead", "Paid Search", "paid"],
+                    ["2026-09-01", "Chile", "3", "Lead", "Paid Search", "paid"],
+                    ["2026-09-01", "Canada", "4", "Lead", "Paid Search", "paid"],
+                    ["2026-09-01", "Spain", "5", "Lead", "Paid Search", "paid"],
+                    ["2026-09-01", "", "6", "Lead", "Paid Search", "paid"],
+                ],
+                columns=["date", "region", "record_id", "lifecycle_stage", "source", "source_class"],
+            ).assign(date=lambda frame: pd.to_datetime(frame["date"])),
+            "ad_cost": pd.DataFrame(
+                [["2026-09-01", "Hytera LATAM North", 60], ["2026-09-01", "Hytera Brazil", 40]],
+                columns=["date", "region", "cost"],
+            ).assign(date=lambda frame: pd.to_datetime(frame["date"])),
+        },
+        diagnostics=[],
+    )
+
+
+def test_region_filter_matches_countries_through_region_groups():
+    bundle = _bundle_with_region_groups()
+
+    brazil = compute_kpis(bundle, ("2026-09-01", "2026-09-02"), ["Brazil"])
+    north = compute_kpis(bundle, ("2026-09-01", "2026-09-02"), ["LATAM North"])
+    south = compute_kpis(bundle, ("2026-09-01", "2026-09-02"), ["LATAM South"])
+
+    assert brazil["all_leads"] == 1
+    assert north["all_leads"] == 1
+    assert south["all_leads"] == 1
+
+
+def test_ad_spend_follows_account_to_region_group_mapping():
+    bundle = _bundle_with_region_groups()
+
+    assert compute_kpis(bundle, ("2026-09-01", "2026-09-02"), ["Brazil"])["ad_spend"] == 40
+    assert compute_kpis(bundle, ("2026-09-01", "2026-09-02"), ["LATAM North"])["ad_spend"] == 60
+    assert compute_kpis(bundle, ("2026-09-01", "2026-09-02"), ["LATAM South"])["ad_spend"] == 0
+
+
+def test_unfiltered_region_keeps_unmapped_countries_and_blank_regions():
+    """不在区域组内的国家和空地区行只在不限地区时计入，不能凭空消失。"""
+    bundle = _bundle_with_region_groups()
+
+    assert compute_kpis(bundle, ("2026-09-01", "2026-09-02"), [])["all_leads"] == 6
+    assert compute_kpis(bundle, ("2026-09-01", "2026-09-02"), ["Brazil", "LATAM North", "LATAM South", "Canada"])["all_leads"] == 4
+
+
+def test_region_heatmap_labels_rows_with_region_groups():
+    heatmap = compute_region_heatmap(_bundle_with_region_groups(), ("2026-09-01", "2026-09-02"), [])
+
+    assert set(heatmap["region"]) == {"Brazil", "LATAM North", "LATAM South", "Canada", "Other", "Unassigned"}
+
+
+def test_target_specs_point_at_real_kpi_keys():
+    """TARGET_SPECS 的 metric 必须真的存在于 compute_kpis 里，避免改目标时写错键名。"""
+    kpis = compute_kpis(sample_bundle(), ("2026-09-01", "2026-09-02"), ["Brazil"])
+
+    for spec in TARGET_SPECS:
+        assert spec["metric"] in kpis, spec
+
+
+def test_target_progress_reports_attainment_and_gap():
+    kpis = compute_kpis(sample_bundle(), ("2026-09-01", "2026-09-02"), ["Brazil"])
+    progress = compute_target_progress(
+        kpis,
+        {"organic_traffic": 11, "leads": 6, "mqls": None, "sqls": None, "revenue": 2000},
+    )
+
+    # 22 / 11 = 200%，超出 11
+    assert progress["organic_traffic"]["attainment"] == 2
+    assert progress["organic_traffic"]["gap"] == 11
+    # 3 / 6 = 50%，还差 3
+    assert progress["leads"]["attainment"] == 0.5
+    assert progress["leads"]["gap"] == -3
+    assert progress["revenue"]["gap"] == -1000
+    assert progress["revenue"]["format"] == "money"
+
+
+def test_target_progress_is_none_when_target_is_unset_or_zero():
+    """没填目标、填 0、填非法值时都不算达成率，不能伪造 0% 或无穷值。"""
+    kpis = compute_kpis(sample_bundle(), ("2026-09-01", "2026-09-02"), ["Brazil"])
+
+    for raw in (None, "", 0, "abc", -5):
+        progress = compute_target_progress(kpis, {"leads": raw})
+        assert progress["leads"]["attainment"] is None
+        assert progress["leads"]["gap"] is None
+        assert progress["leads"]["target"] is None
+
+
+def test_as_number_normalises_input_widget_values():
+    assert as_number(15500) == 15500
+    assert as_number("15500") == 15500
+    assert as_number(15500.0) == 15500
+    for blank in (None, "", "  ", 0, -1, "abc", float("nan")):
+        assert as_number(blank) is None
+

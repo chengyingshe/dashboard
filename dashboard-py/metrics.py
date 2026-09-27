@@ -4,7 +4,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from config import AD_ACCOUNT_REGION_MAP
+from config import OTHER_REGION_GROUP, TARGET_SPECS, region_group
 from data_loader import DataBundle
 
 
@@ -64,43 +64,27 @@ def _days(frame: pd.DataFrame) -> pd.Series:
 
 
 def _selected(frame: pd.DataFrame | None, date_range, regions: Iterable[str]) -> pd.DataFrame:
+    """按日期 + 区域组筛选。
+
+    Region 下拉给的是区域组（Brazil / Mexico / LATAM North / LATAM South / Canada），
+    region 列存的却是国家名（广告花费存的是投放账户名），因此统一经
+    `config.region_group` 归一后再匹配。
+    """
     if frame is None or frame.empty:
         return pd.DataFrame()
     start = pd.to_datetime(date_range[0]).normalize()
     end = pd.to_datetime(date_range[1]).normalize() + pd.Timedelta(days=1)
     result = frame[(frame["date"] >= start) & (frame["date"] < end)].copy()
-    regions = list(regions or [])
+    result["region_group"] = result["region"].map(region_group) if "region" in result.columns else OTHER_REGION_GROUP
+    # 传单个字符串时按一个区域处理，不能被拆成字符
+    regions = [regions] if isinstance(regions, str) else list(regions or [])
     if regions and "All Regions" not in regions:
-        result = result[result["region"].isin(regions)]
+        result = result[result["region_group"].isin(regions)]
     return result
 
 
-def _selected_ad_cost(frame: pd.DataFrame | None, date_range, regions: Iterable[str]) -> pd.DataFrame:
-    """广告花费按账户筛选：先按日期过滤，再经「账户 -> 国家」映射参与地区筛选。"""
-    result = _selected(frame, date_range, [])
-    if result.empty:
-        return result
-    regions = list(regions or [])
-    if not regions or "All Regions" in regions:
-        return result
-    selected = set(regions)
-
-    def matched(account):
-        countries = AD_ACCOUNT_REGION_MAP.get(account)
-        # 配置了映射走账户覆盖国家；没有配置时把该列当作普通地区名直接匹配
-        return bool(selected & set(countries)) if countries else account in selected
-
-    return result[result["region"].map(matched)]
-
-
 def filter_bundle(bundle: DataBundle, date_range, regions) -> dict[str, pd.DataFrame]:
-    tables = {}
-    for name, frame in bundle.tables.items():
-        if name == "ad_cost":
-            tables[name] = _selected_ad_cost(frame, date_range, regions)
-        else:
-            tables[name] = _selected(frame, date_range, regions)
-    return tables
+    return {name: _selected(frame, date_range, regions) for name, frame in bundle.tables.items()}
 
 
 def compute_kpis(bundle: DataBundle, date_range, regions) -> dict:
@@ -149,6 +133,47 @@ def compute_kpis(bundle: DataBundle, date_range, regions) -> dict:
         "cost_per_mql": safe_ratio(ad_spend, paid_mqls),
         "roas": safe_ratio(paid_revenue, ad_spend),
     }
+
+
+def as_number(value) -> float | None:
+    """把前端输入框的值转成数字。
+
+    `dcc.Input` 清空时给 `None`，非法输入可能给空串或 NaN，一律当作「没填目标」；
+    目标为 0 也按没填处理，避免拿 0 当分母算出无穷达成率。
+    """
+    if value is None or value == "":
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number:  # NaN
+        return None
+    return number if number > 0 else None
+
+
+def compute_target_progress(kpis: dict, targets: dict | None) -> dict[str, dict]:
+    """每个目标的达成情况：实际值、目标值、达成率、缺口。
+
+    `TARGET_SPECS` 是唯一的目标清单来源（config.py）。目标没填或 KPI 缺失时
+    `attainment` / `gap` 返回 `None`，页面显示 `N/A`，不能伪造 0% 或无穷值。
+    """
+    progress: dict[str, dict] = {}
+    for spec in TARGET_SPECS:
+        target_id = spec["id"]
+        actual = kpis.get(spec["metric"])
+        target = as_number((targets or {}).get(target_id))
+        if actual is None or target is None:
+            progress[target_id] = {"actual": actual, "target": target, "attainment": None, "gap": None, "format": spec["format"]}
+            continue
+        progress[target_id] = {
+            "actual": actual,
+            "target": target,
+            "attainment": safe_ratio(actual, target),
+            "gap": actual - target,
+            "format": spec["format"],
+        }
+    return progress
 
 
 def compute_funnel(bundle: DataBundle, date_range, regions, paid=False) -> pd.DataFrame:
@@ -241,12 +266,13 @@ def compute_source_share(bundle: DataBundle, date_range, regions, metric: str) -
 
 
 def compute_region_heatmap(bundle: DataBundle, date_range, regions) -> pd.DataFrame:
+    """区域维度诊断：按 Region 下拉的同一套区域组聚合，行标签与筛选器一致。"""
     leads = filter_bundle(bundle, date_range, regions).get("leads", pd.DataFrame())
     if leads.empty:
         return pd.DataFrame(columns=["region", "date", "value"])
     frame = leads.assign(date=_days(leads))
     rows = []
-    for (region, date), group in frame.groupby(["region", "date"]):
+    for (region, date), group in frame.groupby(["region_group", "date"]):
         mql = len(group[_stage_mask(group, MQL_STAGES)])
         rows.append({"region": region, "date": date, "value": safe_ratio(mql, len(group))})
     return pd.DataFrame(rows)

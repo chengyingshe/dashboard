@@ -1,5 +1,10 @@
 # Digital Marketing Dashboard Design
 
+> **历史文档**：本规格写于 2026-09-22，其中的指标定义已被 `数据口径.xlsx` Sheet1 取代。
+> 取数方式、生命周期集合、漏斗层级一律以 AGENTS.md「业务指标口径」一节为准；本文档仅保留
+> 视觉与页面结构的设计意图。差异要点：COUNT 全部按行计数、来源按 Organic/Paid 前缀匹配、
+> All Revenue 求和不再限定 Closed Won、漏斗第 5 层由 Deals 改为 Customers。
+
 ## 1. Goal
 
 Build a local Plotly Dash application that provides a daily digital marketing performance dashboard. The visual direction follows the supplied reference image: a dark blue header, KPI cards, funnel diagnostics, trend charts, source contribution charts, paid media efficiency, and regional performance diagnosis.
