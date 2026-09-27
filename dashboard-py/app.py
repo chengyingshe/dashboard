@@ -91,10 +91,25 @@ def create_app(data_dir=None):
     return app
 
 
+def _bool_flag(value: str) -> bool:
+    return str(value).strip().lower() not in {"0", "false", "no", "off", ""}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", default=None)
     parser.add_argument("--port", type=int, default=8050)
     parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--debug", default="1", help="开启 debug：Dash dev tools + 浏览器热刷新 + Werkzeug reloader")
+    parser.add_argument("--reload", default="1", help="Werkzeug reloader：改 .py 后自动重启进程（需要能创建子进程）")
     args = parser.parse_args()
-    create_app(args.data_dir).run(debug=True, host=args.host, port=args.port)
+    debug = _bool_flag(args.debug)
+    create_app(args.data_dir).run(
+        debug=debug,
+        host=args.host,
+        port=args.port,
+        dev_tools_hot_reload=debug,
+        dev_tools_ui=debug,
+        # 直接透传给 Flask.run / werkzeug.run_simple
+        use_reloader=debug and _bool_flag(args.reload),
+    )
