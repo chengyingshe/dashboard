@@ -36,5 +36,9 @@ htmlcov/
 Thumbs.db
 *.swp
 
+# Office temp / lock files
+~$*
+*.tmp
+
 # Local tooling metadata
 .workbuddy/
