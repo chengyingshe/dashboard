@@ -55,7 +55,7 @@ def test_compute_kpis_uses_business_definitions():
     assert result["paid_leads"] == 2
     assert result["paid_mqls"] == 1
     assert result["paid_sqls"] == 0
-    assert result["paid_deals"] == 0
+    assert result["paid_customers"] == 0
     assert result["paid_revenue"] == 600
     assert result["cost_per_lead"] == 50
     assert result["cost_per_mql"] == 100
@@ -81,10 +81,10 @@ def test_lead_counts_exclude_subscriber_and_blank_stages():
     assert result["all_mqls"] == 1
     assert result["all_sqls"] == 1
     assert result["all_customers"] == 1
-    assert result["paid_deals"] == 0
+    assert result["paid_customers"] == 0
 
 
-def test_paid_deals_counts_paid_customers_and_paid_revenue_sums_amount():
+def test_paid_customers_and_paid_revenue_follow_the_spec():
     bundle = sample_bundle()
     bundle.tables["leads"] = pd.DataFrame(
         [
@@ -97,7 +97,7 @@ def test_paid_deals_counts_paid_customers_and_paid_revenue_sums_amount():
 
     result = compute_kpis(bundle, ("2026-09-01", "2026-09-02"), ["Brazil"])
 
-    assert result["paid_deals"] == 1
+    assert result["paid_customers"] == 1
     assert result["paid_revenue"] == 600
     assert result["roas"] == 6
 

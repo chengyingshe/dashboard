@@ -113,13 +113,13 @@ Traffic 的 `Grand total` 汇总行不参与明细计算。
 | Paid Leads | Leads | 付费来源且 `∈ LEAD_STAGES` 的行数 |
 | Paid MQLs | Leads | 付费来源且 `∈ MQL_STAGES` 的行数 |
 | Paid SQLs | Leads | 付费来源且 `∈ SQL_STAGES` 的行数 |
-| Paid Deals | **Leads** | 付费来源且 `== Customer` 的行数（不是 Deal 表） |
+| Paid Customers | **Leads** | 付费来源且 `== Customer` 的行数（不是 Deal 表） |
 | Paid Revenue | Deals | 付费来源的 Amount 求和 |
 | Cost per Lead | — | `Ad Spend / Paid Leads` |
 | Cost per MQL | — | `Ad Spend / Paid MQLs` |
 | ROAS | — | `Paid Revenue / Ad Spend` |
 
-漏斗顺序：`Traffic -> Leads -> MQLs -> SQLs -> Customers -> Revenue`。第 5 层整体与付费都用 **Customers**（Sheet1 的 All Customers / Paid Deals 同源，`metrics.FUNNEL_KEYS`），不要再拿 Deal 表的成交笔数当漏斗层。最后一层 Revenue 是金额，与计数不同量纲，不计算环节转化率。分母为空或为 0 时返回 `None`，页面显示 `N/A`，不能显示无穷值或伪造的 0。
+漏斗顺序：`Traffic -> Leads -> MQLs -> SQLs -> Customers -> Revenue`。第 5 层整体与付费都用 **Customers**（Sheet1 的 All Customers / Paid Customers 同源，`metrics.FUNNEL_KEYS`），不要再拿 Deal 表的成交笔数当漏斗层。最后一层 Revenue 是金额，与计数不同量纲，不计算环节转化率。分母为空或为 0 时返回 `None`，页面显示 `N/A`，不能显示无穷值或伪造的 0。
 
 环比按**等长前移区间**计算：当前区间 N 天，则对比其前 N 天（`app._previous_period`）。不要用"区间聚合值 vs 前一日单日值"，那会得出几千个百分点的无意义数字。分母缺失或为 0 时显示 `N/A`。
 

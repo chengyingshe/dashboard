@@ -27,7 +27,7 @@ PAID_CARDS = [
     ("Paid Leads", "paid_leads"),
     ("Paid MQLs", "paid_mqls"),
     ("Paid SQLs", "paid_sqls"),
-    ("Paid Deals", "paid_deals"),
+    ("Paid Customers", "paid_customers"),
     ("Paid Revenue", "paid_revenue"),
     ("Cost per Lead", "cost_per_lead"),
     ("Cost per MQL", "cost_per_mql"),

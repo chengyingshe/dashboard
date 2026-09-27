@@ -14,10 +14,10 @@ MQL_STAGES = {"Marketing Qualified Lead", "Sales Qualified Lead", "Customer"}
 SQL_STAGES = {"Sales Qualified Lead", "Customer"}
 CUSTOMER_STAGE = "Customer"
 
-# 漏斗第 5 层统一用 Customers（Sheet1 的 All Customers / Paid Deals 同源）
+# 漏斗第 5 层统一用 Customers（Sheet1 的 All Customers / Paid Customers 同源）
 FUNNEL_KEYS = {
     "all": ["all_traffic", "all_leads", "all_mqls", "all_sqls", "all_customers", "all_revenue"],
-    "paid": ["paid_traffic", "paid_leads", "paid_mqls", "paid_sqls", "paid_deals", "paid_revenue"],
+    "paid": ["paid_traffic", "paid_leads", "paid_mqls", "paid_sqls", "paid_customers", "paid_revenue"],
 }
 FUNNEL_LABELS = ["Traffic", "Leads", "MQLs", "SQLs", "Customers", "Revenue"]
 
@@ -111,7 +111,7 @@ def compute_kpis(bundle: DataBundle, date_range, regions) -> dict:
     ad_cost = tables.get("ad_cost", pd.DataFrame())
 
     paid = leads["source_class"].eq("paid") if not leads.empty else None
-    paid_deals_mask = deals["source_class"].eq("paid") if not deals.empty else None
+    paid_revenue_mask = deals["source_class"].eq("paid") if not deals.empty else None
 
     def lead_count(stages):
         if leads.empty:
@@ -126,8 +126,8 @@ def compute_kpis(bundle: DataBundle, date_range, regions) -> dict:
     paid_leads = paid_lead_count(LEAD_STAGES)
     paid_mqls = paid_lead_count(MQL_STAGES)
     paid_sqls = paid_lead_count(SQL_STAGES)
-    paid_deals = paid_lead_count(CUSTOMER_STAGE)
-    paid_revenue = _sum_column(deals, "amount", paid_deals_mask)
+    paid_customers = paid_lead_count(CUSTOMER_STAGE)
+    paid_revenue = _sum_column(deals, "amount", paid_revenue_mask)
     ad_spend = _sum_column(ad_cost, "cost")
 
     return {
@@ -143,7 +143,7 @@ def compute_kpis(bundle: DataBundle, date_range, regions) -> dict:
         "paid_leads": paid_leads,
         "paid_mqls": paid_mqls,
         "paid_sqls": paid_sqls,
-        "paid_deals": paid_deals,
+        "paid_customers": paid_customers,
         "paid_revenue": paid_revenue,
         "cost_per_lead": safe_ratio(ad_spend, paid_leads),
         "cost_per_mql": safe_ratio(ad_spend, paid_mqls),
@@ -192,7 +192,7 @@ def compute_daily_trends(bundle: DataBundle, date_range, regions) -> pd.DataFram
         leads_daily["paid_leads"] = daily(paid & _stage_mask(frame, LEAD_STAGES))
         leads_daily["paid_mqls"] = daily(paid & _stage_mask(frame, MQL_STAGES))
         leads_daily["paid_sqls"] = daily(paid & _stage_mask(frame, SQL_STAGES))
-        leads_daily["paid_deals"] = daily(paid & _stage_mask(frame, CUSTOMER_STAGE))
+        leads_daily["paid_customers"] = daily(paid & _stage_mask(frame, CUSTOMER_STAGE))
         result = result.merge(leads_daily.rename_axis("date"), on="date", how="left")
 
     deals = tables.get("deals", pd.DataFrame())
@@ -210,7 +210,7 @@ def compute_daily_trends(bundle: DataBundle, date_range, regions) -> pd.DataFram
 
     required_numeric = [
         "all_traffic", "organic_traffic", "paid_traffic", "all_leads", "all_mqls", "all_sqls", "all_customers",
-        "paid_leads", "paid_mqls", "paid_sqls", "paid_deals", "all_revenue", "paid_revenue", "ad_spend",
+        "paid_leads", "paid_mqls", "paid_sqls", "paid_customers", "all_revenue", "paid_revenue", "ad_spend",
     ]
     for column in required_numeric:
         if column not in result:
