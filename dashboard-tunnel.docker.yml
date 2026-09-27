@@ -1,0 +1,11 @@
+# Shared Cloudflare Named Tunnel configuration for Docker.
+# This keeps the existing Sub2API route and adds the dashboard route.
+tunnel: 49b43605-953d-4b2c-8902-a00d2bbbb52f
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: sub2api.chengying-she.top
+    service: http://host.docker.internal:8080
+  - hostname: dashboard.chengying-she.top
+    service: http://dashboard:8050
+  - service: http_status:404

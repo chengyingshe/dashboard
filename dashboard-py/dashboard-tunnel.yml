@@ -1,0 +1,10 @@
+# Replace TUNNEL_ID with the ID of your Cloudflare Named Tunnel.
+# The credentials-file path is normally created by:
+#   cloudflared tunnel create dashboard
+tunnel: TUNNEL_ID
+credentials-file: C:\Users\<YOUR_WINDOWS_USERNAME>\.cloudflared\TUNNEL_ID.json
+
+ingress:
+  - hostname: dashboard.chengying-she.top
+    service: http://127.0.0.1:8050
+  - service: http_status:404

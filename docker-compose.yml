@@ -1,0 +1,35 @@
+name: digital-marketing-dashboard
+
+services:
+  dashboard:
+    build:
+      context: ./dashboard-py
+      dockerfile: Dockerfile
+    container_name: digital-marketing-dashboard
+    restart: unless-stopped
+    command: ["python", "app.py", "--data-dir", "/data", "--host", "0.0.0.0", "--port", "8050"]
+    volumes:
+      - ./数据底表V1:/data:ro
+    ports:
+      - "127.0.0.1:8050:8050"
+    networks:
+      - dashboard-network
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: digital-marketing-dashboard-cloudflared
+    restart: unless-stopped
+    depends_on:
+      - dashboard
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./dashboard-tunnel.docker.yml:/etc/cloudflared/config.yml:ro
+      - C:/Users/Administrator/.cloudflared/49b43605-953d-4b2c-8902-a00d2bbbb52f.json:/etc/cloudflared/credentials.json:ro
+    networks:
+      - dashboard-network
+
+networks:
+  dashboard-network:
+    driver: bridge
