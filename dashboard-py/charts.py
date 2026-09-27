@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
@@ -41,18 +42,32 @@ def empty_figure(title: str, message: str) -> go.Figure:
 
 
 def make_funnel_figure(funnel_df, title: str) -> go.Figure:
-    if funnel_df.empty:
+    if funnel_df.empty or not funnel_df["value"].abs().sum():
         return empty_figure(title, "No data for the selected filters")
     figure = _base_figure(title)
+    stages = funnel_df["stage"].tolist()
+    values = funnel_df["value"].tolist()
+    conversions = funnel_df["conversion"].tolist() if "conversion" in funnel_df else [None] * len(values)
+    top = values[0] if values else 0
+    labels = []
+    for index, (stage, value) in enumerate(zip(stages, values)):
+        share = f"{value / top:.0%} of top" if top else "no baseline"
+        # conversion 经 DataFrame 中转后会变成 NaN，不能只判 None
+        rate = conversions[index]
+        step = "" if index == 0 or rate is None or pd.isna(rate) else f" · step {rate:.1%}"
+        labels.append(f"{stage}<br>{value:,.0f} ({share}{step})")
     figure.add_trace(
         go.Funnel(
-            y=funnel_df["stage"],
-            x=funnel_df["value"],
-            textinfo="label+value",
+            y=stages,
+            x=values,
+            text=labels,
+            textinfo="text",
+            textposition="inside",
             marker={"color": [COLORS["blue"], COLORS["teal"], COLORS["yellow"], COLORS["orange"], COLORS["red"], COLORS["purple"]]},
             hovertemplate="%{y}: %{x:,.0f}<extra></extra>",
         )
     )
+    figure.update_layout(margin={"l": 130, "r": 24, "t": 52, "b": 42})
     return figure
 
 
@@ -60,7 +75,7 @@ def make_conversion_trend_figure(trend_df) -> go.Figure:
     if trend_df.empty:
         return empty_figure("Conversion Rate Trend", "No data for the selected filters")
     figure = _base_figure("Conversion Rate Trend")
-    series = [("Traffic → Leads", "lead_conversion", COLORS["blue"]), ("Leads → MQLs", "mql_conversion", COLORS["teal"]), ("MQLs → SQLs", "sql_conversion", COLORS["orange"]), ("SQLs → Deals", "deal_conversion", COLORS["purple"])]
+    series = [("Traffic → Leads", "lead_conversion", COLORS["blue"]), ("Leads → MQLs", "mql_conversion", COLORS["teal"]), ("MQLs → SQLs", "sql_conversion", COLORS["orange"]), ("SQLs → Customers", "customer_conversion", COLORS["purple"])]
     for label, column, color in series:
         if column in trend_df:
             figure.add_trace(go.Scatter(x=trend_df["date"], y=trend_df[column], name=label, mode="lines+markers", line={"color": color, "width": 2}, connectgaps=False, hovertemplate="%{x|%b %d}: %{y:.1%}<extra>%{fullData.name}</extra>"))
@@ -97,7 +112,15 @@ def make_heatmap_figure(heatmap_df, title: str) -> go.Figure:
     if heatmap_df.empty:
         return empty_figure(title, "No regional data for the selected filters")
     matrix = heatmap_df.pivot(index="region", columns="date", values="value")
-    figure = px.imshow(matrix, color_continuous_scale=[[0, "#f6c4c8"], [0.5, "#ffe58a"], [1, "#61c59a"]], zmin=0, zmax=1, aspect="auto", labels={"color": "Rate"})
+    highest = float(matrix.max().max()) if not matrix.empty and matrix.notna().any().any() else 1.0
+    figure = px.imshow(
+        matrix,
+        color_continuous_scale=[[0, "#f6c4c8"], [0.5, "#ffe58a"], [1, "#61c59a"]],
+        zmin=0,
+        zmax=max(1.0, highest),
+        aspect="auto",
+        labels={"color": "Rate"},
+    )
     figure.update_layout(title={"text": title, "font": {"size": 15, "color": COLORS["ink"]}}, height=300, margin={"l": 72, "r": 24, "t": 52, "b": 42}, paper_bgcolor="white", plot_bgcolor="white")
     figure.update_traces(texttemplate="%{z:.0%}", hovertemplate="%{y} · %{x|%b %d}: %{z:.1%}<extra></extra>")
     return figure

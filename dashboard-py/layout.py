@@ -10,6 +10,35 @@ def _card(title: str, value_id: str, delta_id: str) -> html.Div:
     )
 
 
+# KPI 卡片的 id 由指标名派生：organic_traffic -> kpi-organic-traffic / delta-organic-traffic
+OVERALL_CARDS = [
+    ("Organic Traffic", "organic_traffic"),
+    ("All Traffic", "all_traffic"),
+    ("All Leads", "all_leads"),
+    ("All MQLs", "all_mqls"),
+    ("All SQLs", "all_sqls"),
+    ("All Customers", "all_customers"),
+    ("All Revenue", "all_revenue"),
+]
+
+PAID_CARDS = [
+    ("Ad Spend", "ad_spend"),
+    ("Paid Traffic", "paid_traffic"),
+    ("Paid Leads", "paid_leads"),
+    ("Paid MQLs", "paid_mqls"),
+    ("Paid SQLs", "paid_sqls"),
+    ("Paid Deals", "paid_deals"),
+    ("Paid Revenue", "paid_revenue"),
+    ("Cost per Lead", "cost_per_lead"),
+    ("Cost per MQL", "cost_per_mql"),
+    ("ROAS", "roas"),
+]
+
+
+def _cards(specs):
+    return [_card(title, f"kpi-{name.replace('_', '-')}", f"delta-{name.replace('_', '-')}") for title, name in specs]
+
+
 def build_layout(regions, min_date=None, max_date=None, start_date=None):
     return html.Div(
         [
@@ -29,10 +58,10 @@ def build_layout(regions, min_date=None, max_date=None, start_date=None):
                         ],
                         className="filters",
                     ),
-                    html.Section([html.Div("1", className="section-number"), html.H2("What happened?"), html.Div("Overall results", className="section-kicker"), html.Div([_card("Organic Traffic", "kpi-organic-traffic", "delta-organic-traffic"), _card("All Traffic", "kpi-all-traffic", "delta-all-traffic"), _card("All Leads", "kpi-all-leads", "delta-all-leads"), _card("All MQLs", "kpi-all-mqls", "delta-all-mqls"), _card("All SQLs", "kpi-all-sqls", "delta-all-sqls"), _card("All Revenue", "kpi-all-revenue", "delta-all-revenue")], className="kpi-grid")], className="dashboard-section"),
+                    html.Section([html.Div("1", className="section-number"), html.H2("What happened?"), html.Div("Overall results", className="section-kicker"), html.Div(_cards(OVERALL_CARDS), className="kpi-grid")], className="dashboard-section"),
                     html.Section([html.Div("2", className="section-number"), html.H2("Where is the funnel leaking?"), html.Div("Funnel diagnosis", className="section-kicker"), html.Div([dcc.Graph(id="overall-funnel", config={"displayModeBar": False}), dcc.Graph(id="paid-funnel", config={"displayModeBar": False}), dcc.Graph(id="conversion-trend", config={"displayModeBar": False})], className="three-column")], className="dashboard-section"),
                     html.Section([html.Div("3", className="section-number"), html.H2("Which source contributes the most?"), html.Div("Channel contribution", className="section-kicker"), html.Div([dcc.Graph(id="traffic-share", config={"displayModeBar": False}), dcc.Graph(id="lead-share", config={"displayModeBar": False}), dcc.Graph(id="mql-share", config={"displayModeBar": False})], className="three-column")], className="dashboard-section"),
-                    html.Section([html.Div("4", className="section-number"), html.H2("Is the paid media worth it?"), html.Div("Paid media efficiency", className="section-kicker"), html.Div([_card("Ad Spend", "kpi-ad-spend", "delta-ad-spend"), _card("Cost per Lead", "kpi-cost-per-lead", "delta-cost-per-lead"), _card("Cost per MQL", "kpi-cost-per-mql", "delta-cost-per-mql"), _card("ROAS", "kpi-roas", "delta-roas"), dcc.Graph(id="efficiency-trend", config={"displayModeBar": False})], className="efficiency-grid")], className="dashboard-section"),
+                    html.Section([html.Div("4", className="section-number"), html.H2("Is the paid media worth it?"), html.Div("Paid media efficiency", className="section-kicker"), html.Div([html.Div(_cards(PAID_CARDS), className="kpi-grid"), dcc.Graph(id="efficiency-trend", config={"displayModeBar": False})], className="efficiency-block")], className="dashboard-section"),
                     html.Section([html.Div("5", className="section-number"), html.H2("Performance diagnosis"), html.Div("Region and day diagnosis", className="section-kicker"), dcc.Graph(id="region-heatmap", config={"displayModeBar": False})], className="dashboard-section"),
                 ],
                 className="content",

@@ -69,3 +69,46 @@ def test_parses_compact_numeric_dates_as_calendar_dates(tmp_path):
     bundle = load_folder(tmp_path)
 
     assert bundle.tables["traffic"].iloc[0]["date"] == pd.Timestamp("2026-01-01")
+
+
+def test_dates_are_truncated_to_calendar_days(tmp_path):
+    """HubSpot 导出的 Create Date / Close Date 带时分秒，必须归一到日历日。"""
+    write_csv(
+        tmp_path / "leads.csv",
+        ["Record ID", "Create Date", "Lifecycle Stage", "Original Traffic Source", "Region", "Email"],
+        [["1", "2026-09-01 08:30", "Lead", "Paid Search", "Brazil", "a@x.com"]],
+    )
+    write_csv(
+        tmp_path / "deals.csv",
+        ["Record ID", "Close Date", "Deal Stage", "Amount", "Original Traffic Source", "Region"],
+        [["d1", "2026-09-02 17:45", "Closed Won", "100", "Paid Search", "Brazil"]],
+    )
+
+    bundle = load_folder(tmp_path)
+
+    assert bundle.tables["leads"]["date"].iloc[0] == pd.Timestamp("2026-09-01")
+    assert bundle.tables["deals"]["date"].iloc[0] == pd.Timestamp("2026-09-02")
+
+
+def test_source_class_matches_organic_and_paid_prefixes_only(tmp_path):
+    """口径表要求来源以 Organic / Paid 开头才归类，中间出现关键词的来源不算。"""
+    write_csv(
+        tmp_path / "traffic.csv",
+        ["Date", "Region", "Session default channel group", "Sessions"],
+        [
+            ["2026-09-01", "Brazil", "Organic Shopping", "1"],
+            ["2026-09-01", "Brazil", "Paid Other", "2"],
+            ["2026-09-01", "Brazil", "Display", "3"],
+            ["2026-09-01", "Brazil", "Other Campaigns", "4"],
+            ["2026-09-01", "Brazil", "Unassigned", "5"],
+        ],
+    )
+
+    frame = load_folder(tmp_path).tables["traffic"]
+    classes = dict(zip(frame["source"], frame["source_class"]))
+
+    assert classes["Organic Shopping"] == "organic"
+    assert classes["Paid Other"] == "paid"
+    assert classes["Display"] == "other"
+    assert classes["Other Campaigns"] == "other"
+    assert classes["Unassigned"] == "other"
